@@ -18,41 +18,50 @@ async fn main() {
         .await
         .unwrap();
 
-    let _ = encode_as_json(&flashblocks);
-    let _ = encode_as_gzip_json(&flashblocks);
-    let _ = encode_as_ssz(&flashblocks);
-    let _ = encode_as_gzip_ssz(&flashblocks);
+    let json_bytes = encode_as_json(&flashblocks);
+    let gzip_json_bytes = encode_as_gzip_json(&flashblocks);
+    let ssz_bytes = encode_as_ssz(&flashblocks);
+    let gzip_ssz_bytes = encode_as_gzip_ssz(&flashblocks);
+
+    println!("JSON bytes: {:?}", json_bytes);
+    println!("GZIP JSON bytes: {:?}", gzip_json_bytes);
+    println!("SSZ bytes: {:?}", ssz_bytes);
+    println!("GZIP SSZ bytes: {:?}", gzip_ssz_bytes);
+
+    let json_to_gzip_ratio = json_bytes as f64 / gzip_json_bytes as f64;
+    let json_to_ssz_ratio = json_bytes as f64 / ssz_bytes as f64;
+    let json_to_gzip_ssz_ratio = json_bytes as f64 / gzip_ssz_bytes as f64;
+    let ssz_to_gzip_ssz_ratio = ssz_bytes as f64 / gzip_ssz_bytes as f64;
+
+    println!("JSON -> GZIP JSON: {:?}", json_to_gzip_ratio);
+    println!("JSON -> SSZ: {:?}", json_to_ssz_ratio);
+    println!("JSON -> GZIP SSZ: {:?}", json_to_gzip_ssz_ratio);
+    println!("SSZ -> GZIP SSZ: {:?}", ssz_to_gzip_ssz_ratio);
 }
 
-fn encode_as_json(flashblocks: &Vec<FlashblocksPayloadV1>) -> Vec<u8> {
+fn encode_as_json(flashblocks: &Vec<FlashblocksPayloadV1>) -> usize {
     let serialized = serde_json::to_vec(&flashblocks).unwrap();
-    println!("JSON bytes len: {:?}", serialized.len());
-    serialized
+    serialized.len()
 }
 
-fn encode_as_gzip_json(flashblocks: &Vec<FlashblocksPayloadV1>) -> Vec<u8> {
+fn encode_as_gzip_json(flashblocks: &Vec<FlashblocksPayloadV1>) -> usize {
     let serialized = serde_json::to_vec(&flashblocks).unwrap();
     let mut gz_encoder = GzEncoder::new(Vec::new(), Compression::default());
     gz_encoder.write_all(&serialized).unwrap();
     let compressed = gz_encoder.finish().unwrap();
 
-    println!("GZIP JSON bytes len: {:?}", compressed.len());
-
-    compressed
+    compressed.len()
 }
 
-fn encode_as_ssz(flashblocks: &Vec<FlashblocksPayloadV1>) -> Vec<u8> {
-    let serialized = flashblocks.as_ssz_bytes();
-    println!("SSZ bytes len: {:?}", serialized.len());
-    serialized
+fn encode_as_ssz(flashblocks: &Vec<FlashblocksPayloadV1>) -> usize {
+    flashblocks.as_ssz_bytes().len()
 }
 
-fn encode_as_gzip_ssz(flashblocks: &Vec<FlashblocksPayloadV1>) -> Vec<u8> {
+fn encode_as_gzip_ssz(flashblocks: &Vec<FlashblocksPayloadV1>) -> usize {
     let serialized = flashblocks.as_ssz_bytes();
     let mut gz_encoder = GzEncoder::new(Vec::new(), Compression::default());
     gz_encoder.write_all(&serialized).unwrap();
     let compressed = gz_encoder.finish().unwrap();
 
-    println!("GZIP SSZ bytes len: {:?}", compressed.len());
-    compressed
+    compressed.len()
 }
