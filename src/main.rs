@@ -14,7 +14,7 @@ async fn main() {
     let subscriber =
         WebsocketSubscriber::new(Uri::from_static("wss://sepolia.flashblocks.base.org/ws"));
     let flashblocks = subscriber
-        .gather_flashblocks(Duration::from_secs(10))
+        .gather_flashblocks(Duration::from_secs(60))
         .await
         .unwrap();
 
