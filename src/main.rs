@@ -81,10 +81,13 @@ async fn main() {
     let json_to_gzip_ssz_ratio = json_bytes as f64 / gzip_ssz_bytes as f64;
     let ssz_to_gzip_ssz_ratio = ssz_bytes as f64 / gzip_ssz_bytes as f64;
 
-    println!("JSON -> GZIP JSON: {:?}", json_to_gzip_ratio);
-    println!("JSON -> SSZ: {:?}", json_to_ssz_ratio);
-    println!("JSON -> GZIP SSZ: {:?}", json_to_gzip_ssz_ratio);
-    println!("SSZ -> GZIP SSZ: {:?}", ssz_to_gzip_ssz_ratio);
+    println!("JSON -> GZIP JSON: {:?}x improvement", json_to_gzip_ratio);
+    println!("JSON -> SSZ: {:?}x improvement", json_to_ssz_ratio);
+    println!(
+        "JSON -> GZIP SSZ: {:?}x improvement",
+        json_to_gzip_ssz_ratio
+    );
+    println!("SSZ -> GZIP SSZ: {:?}x improvement", ssz_to_gzip_ssz_ratio);
 }
 
 fn encode_as_json(flashblocks: &Vec<FlashblocksPayloadV1>) -> usize {
