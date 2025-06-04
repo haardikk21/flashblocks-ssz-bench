@@ -7,7 +7,9 @@ use std::{
 
 use clap::Parser;
 use flate2::{Compression, write::GzEncoder};
+use futures_util::future::join_all;
 use ssz::Encode;
+use tokio::task;
 use tokio_tungstenite::tungstenite::http::Uri;
 
 use crate::{payload::FlashblocksPayloadV1, subscriber::WebsocketSubscriber};
@@ -65,59 +67,66 @@ async fn main() {
         serde_json::to_writer_pretty(file, &flashblocks).unwrap();
         println!("Wrote flashblocks to file: {}", &file_path.display());
     }
+    println!("");
+    let tasks = vec![
+        ("JSON", task::spawn(encode_as_json(flashblocks.clone()))),
+        (
+            "gzip JSON",
+            task::spawn(encode_as_gzip_json(flashblocks.clone())),
+        ),
+        (
+            "brotli JSON",
+            task::spawn(encode_as_brotli_json(flashblocks.clone())),
+        ),
+        ("SSZ", task::spawn(encode_as_ssz(flashblocks.clone()))),
+        (
+            "gzip SSZ",
+            task::spawn(encode_as_gzip_ssz(flashblocks.clone())),
+        ),
+        (
+            "brotli SSZ",
+            task::spawn(encode_as_brotli_ssz(flashblocks.clone())),
+        ),
+    ];
 
-    let json_bytes = encode_as_json(&flashblocks);
-    let gzip_json_bytes = encode_as_gzip_json(&flashblocks);
-    let brotli_json_bytes = encode_as_brotli_json(&flashblocks);
-    let ssz_bytes = encode_as_ssz(&flashblocks);
-    let gzip_ssz_bytes = encode_as_gzip_ssz(&flashblocks);
-    let brotli_ssz_bytes = encode_as_brotli_ssz(&flashblocks);
+    let results = join_all(tasks.into_iter().map(|(label, handle)| async move {
+        let result = handle.await;
+        (label, result.expect("Failed to get result"))
+    }))
+    .await;
+
+    let mut json_bytes: usize = 0;
+    let mut ssz_bytes: usize = 0;
+    for (label, bytes) in results.clone() {
+        if label == "JSON" {
+            json_bytes = bytes;
+        } else if label == "SSZ" {
+            ssz_bytes = bytes;
+        }
+
+        println!("{}: {:?} bytes", label, bytes);
+    }
 
     println!("");
-    println!("JSON bytes:        {:?}", json_bytes);
-    println!("GZIP JSON bytes:   {:?}", gzip_json_bytes);
-    println!("Brotli JSON bytes: {:?}", brotli_json_bytes);
+    for (label, bytes) in results.clone() {
+        if label != "JSON" {
+            let ratio = json_bytes as f64 / bytes as f64;
+            println!("JSON -> {}: {:.3}x improvement", label, ratio);
+        }
 
-    println!("SSZ bytes:         {:?}", ssz_bytes);
-    println!("GZIP SSZ bytes:    {:?}", gzip_ssz_bytes);
-    println!("Brotli SSZ bytes:  {:?}", brotli_ssz_bytes);
-    println!("");
-
-    let json_to_gzip_ratio = json_bytes as f64 / gzip_json_bytes as f64;
-    let json_to_brotli_ratio = json_bytes as f64 / brotli_json_bytes as f64;
-    let json_to_ssz_ratio = json_bytes as f64 / ssz_bytes as f64;
-    let json_to_gzip_ssz_ratio = json_bytes as f64 / gzip_ssz_bytes as f64;
-    let json_to_brotli_ssz_ratio = json_bytes as f64 / brotli_ssz_bytes as f64;
-    let ssz_to_gzip_ssz_ratio = ssz_bytes as f64 / gzip_ssz_bytes as f64;
-    let ssz_to_brotli_ssz_ratio = ssz_bytes as f64 / brotli_ssz_bytes as f64;
-
-    println!("JSON -> GZIP JSON: {:.3}x improvement", json_to_gzip_ratio);
-    println!(
-        "JSON -> Brotli JSON: {:.3}x improvement",
-        json_to_brotli_ratio
-    );
-    println!("JSON -> SSZ: {:.3}x improvement", json_to_ssz_ratio);
-    println!(
-        "JSON -> GZIP SSZ: {:.3}x improvement",
-        json_to_gzip_ssz_ratio
-    );
-    println!(
-        "JSON -> Brotli SSZ: {:.3}x improvement",
-        json_to_brotli_ssz_ratio
-    );
-    println!("SSZ -> GZIP SSZ: {:.3}x improvement", ssz_to_gzip_ssz_ratio);
-    println!(
-        "SSZ -> Brotli SSZ: {:.3}x improvement",
-        ssz_to_brotli_ssz_ratio
-    );
+        if label.contains("SSZ") && label != "SSZ" {
+            let ratio = ssz_bytes as f64 / bytes as f64;
+            println!("SSZ -> {}: {:.3}x improvement", label, ratio);
+        }
+    }
 }
 
-fn encode_as_json(flashblocks: &Vec<FlashblocksPayloadV1>) -> usize {
+async fn encode_as_json(flashblocks: Vec<FlashblocksPayloadV1>) -> usize {
     let serialized = serde_json::to_vec(&flashblocks).unwrap();
     serialized.len()
 }
 
-fn encode_as_gzip_json(flashblocks: &Vec<FlashblocksPayloadV1>) -> usize {
+async fn encode_as_gzip_json(flashblocks: Vec<FlashblocksPayloadV1>) -> usize {
     let serialized = serde_json::to_vec(&flashblocks).unwrap();
     let mut gz_encoder = GzEncoder::new(Vec::new(), Compression::default());
     gz_encoder.write_all(&serialized).unwrap();
@@ -126,7 +135,7 @@ fn encode_as_gzip_json(flashblocks: &Vec<FlashblocksPayloadV1>) -> usize {
     compressed.len()
 }
 
-fn encode_as_brotli_json(flashblocks: &Vec<FlashblocksPayloadV1>) -> usize {
+async fn encode_as_brotli_json(flashblocks: Vec<FlashblocksPayloadV1>) -> usize {
     let serialized = serde_json::to_vec(&flashblocks).unwrap();
     let mut compressed = Vec::new();
     {
@@ -136,11 +145,11 @@ fn encode_as_brotli_json(flashblocks: &Vec<FlashblocksPayloadV1>) -> usize {
     compressed.len()
 }
 
-fn encode_as_ssz(flashblocks: &Vec<FlashblocksPayloadV1>) -> usize {
+async fn encode_as_ssz(flashblocks: Vec<FlashblocksPayloadV1>) -> usize {
     flashblocks.as_ssz_bytes().len()
 }
 
-fn encode_as_gzip_ssz(flashblocks: &Vec<FlashblocksPayloadV1>) -> usize {
+async fn encode_as_gzip_ssz(flashblocks: Vec<FlashblocksPayloadV1>) -> usize {
     let serialized = flashblocks.as_ssz_bytes();
     let mut gz_encoder = GzEncoder::new(Vec::new(), Compression::default());
     gz_encoder.write_all(&serialized).unwrap();
@@ -149,7 +158,7 @@ fn encode_as_gzip_ssz(flashblocks: &Vec<FlashblocksPayloadV1>) -> usize {
     compressed.len()
 }
 
-fn encode_as_brotli_ssz(flashblocks: &Vec<FlashblocksPayloadV1>) -> usize {
+async fn encode_as_brotli_ssz(flashblocks: Vec<FlashblocksPayloadV1>) -> usize {
     let serialized = flashblocks.as_ssz_bytes();
     let mut compressed = Vec::new();
     {
