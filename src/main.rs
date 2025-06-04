@@ -1,5 +1,11 @@
-use std::{io::Write, time::Duration};
+use std::{
+    fs::{self, File},
+    io::Write,
+    path::PathBuf,
+    time::Duration,
+};
 
+use clap::Parser;
 use flate2::{Compression, write::GzEncoder};
 use ssz::Encode;
 use tokio_tungstenite::tungstenite::http::Uri;
@@ -9,14 +15,56 @@ use crate::{payload::FlashblocksPayloadV1, subscriber::WebsocketSubscriber};
 mod payload;
 mod subscriber;
 
+#[derive(Parser)]
+#[command(name = "flashblocks-ssz-bench")]
+#[command(
+    about = "Compares bytes length of Flashblocks payloads as encoded with JSON, Gzipped JSON, SSZ, and Gzipped SSZ"
+)]
+struct Cli {
+    /// Duration in seconds to gather flashblocks (only used with --gather)
+    #[arg(short = 'd', long = "duration", default_value = "60")]
+    duration: u64,
+
+    /// Read flashblocks from a local JSON file
+    #[arg(short = 'f', long = "file")]
+    file: Option<PathBuf>,
+
+    /// Write gathered flashblocks to a local JSON file
+    #[arg(short = 'w', long = "write")]
+    write: bool,
+}
+
 #[tokio::main]
 async fn main() {
-    let subscriber =
-        WebsocketSubscriber::new(Uri::from_static("wss://sepolia.flashblocks.base.org/ws"));
-    let flashblocks = subscriber
-        .gather_flashblocks(Duration::from_secs(60))
-        .await
-        .unwrap();
+    let cli = Cli::parse();
+
+    let flashblocks = if let Some(file_path) = &cli.file {
+        // Read from file
+        println!("Reading flashblocks from file: {}", file_path.display());
+        let file_content = fs::read_to_string(&file_path)
+            .unwrap_or_else(|e| panic!("Failed to read file {}: {}", file_path.display(), e));
+
+        serde_json::from_str::<Vec<FlashblocksPayloadV1>>(&file_content)
+            .unwrap_or_else(|e| panic!("Failed to parse JSON from file: {}", e))
+    } else {
+        // Default to gather mode if no file specified
+        println!("No file specified, defaulting to gather mode");
+        let subscriber =
+            WebsocketSubscriber::new(Uri::from_static("wss://sepolia.flashblocks.base.org/ws"));
+        subscriber
+            .gather_flashblocks(Duration::from_secs(cli.duration))
+            .await
+            .unwrap()
+    };
+
+    println!("Loaded {} flashblocks", flashblocks.len());
+
+    if cli.file.is_none() && cli.write {
+        let file_path = PathBuf::from("flashblocks.json");
+        let file = File::create(&file_path).unwrap();
+        serde_json::to_writer_pretty(file, &flashblocks).unwrap();
+        println!("Wrote flashblocks to file: {}", &file_path.display());
+    }
 
     let json_bytes = encode_as_json(&flashblocks);
     let gzip_json_bytes = encode_as_gzip_json(&flashblocks);

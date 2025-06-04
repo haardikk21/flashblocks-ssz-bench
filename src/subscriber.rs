@@ -50,8 +50,6 @@ impl WebsocketSubscriber {
             }
         }
 
-        println!("Received {} flashblocks", flashblocks.len());
-
         Ok(flashblocks)
     }
 }
