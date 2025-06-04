@@ -27,7 +27,11 @@ cargo run -- --file flashblocks.json
 
 ### Gzipped JSON
 - Converts `Vec<FlashblocksPayloadV1>` to a JSON byte array
-- Uses `flate2::GzEncoder` with default compression levels to compress the byte array to a compressed version
+- Uses `flate2::GzEncoder` with default compression levels to compress the byte array
+
+### Brotli JSON
+- Converts `Vec<FlashblocksPayloadV1>` to a JSON byte array
+- Uses `brotli::CompressorWriter` to compress the byte array
 
 ### SSZ
 - Converts `Vec<FlashblocksPayloadV1>` to an SSZ byte array, using techniques outlined in [`src/payload.rs`](./src/payload.rs)
@@ -39,3 +43,7 @@ Could probably squeeze a bit more performance here by properly encoding each rec
 ### Gzipped SSZ
 - Converts `Vec<FlashblocksPayloadV1>` to an SSZ byte array, using techniques outlined in [`src/payload.rs`](./src/payload.rs)
 - Uses `flate2::GzEncoder` with default compression levels to compress the byte array to a compressed version
+
+### Brotli SSZ
+- Converts `Vec<FlashblocksPayloadV1>` to an SSZ byte array, using techniques outlined in [`src/payload.rs`](./src/payload.rs)
+- Uses `brotli::CompressorWriter` to compress the byte array

@@ -68,26 +68,48 @@ async fn main() {
 
     let json_bytes = encode_as_json(&flashblocks);
     let gzip_json_bytes = encode_as_gzip_json(&flashblocks);
+    let brotli_json_bytes = encode_as_brotli_json(&flashblocks);
     let ssz_bytes = encode_as_ssz(&flashblocks);
     let gzip_ssz_bytes = encode_as_gzip_ssz(&flashblocks);
+    let brotli_ssz_bytes = encode_as_brotli_ssz(&flashblocks);
 
-    println!("JSON bytes: {:?}", json_bytes);
-    println!("GZIP JSON bytes: {:?}", gzip_json_bytes);
-    println!("SSZ bytes: {:?}", ssz_bytes);
-    println!("GZIP SSZ bytes: {:?}", gzip_ssz_bytes);
+    println!("");
+    println!("JSON bytes:        {:?}", json_bytes);
+    println!("GZIP JSON bytes:   {:?}", gzip_json_bytes);
+    println!("Brotli JSON bytes: {:?}", brotli_json_bytes);
+
+    println!("SSZ bytes:         {:?}", ssz_bytes);
+    println!("GZIP SSZ bytes:    {:?}", gzip_ssz_bytes);
+    println!("Brotli SSZ bytes:  {:?}", brotli_ssz_bytes);
+    println!("");
 
     let json_to_gzip_ratio = json_bytes as f64 / gzip_json_bytes as f64;
+    let json_to_brotli_ratio = json_bytes as f64 / brotli_json_bytes as f64;
     let json_to_ssz_ratio = json_bytes as f64 / ssz_bytes as f64;
     let json_to_gzip_ssz_ratio = json_bytes as f64 / gzip_ssz_bytes as f64;
+    let json_to_brotli_ssz_ratio = json_bytes as f64 / brotli_ssz_bytes as f64;
     let ssz_to_gzip_ssz_ratio = ssz_bytes as f64 / gzip_ssz_bytes as f64;
+    let ssz_to_brotli_ssz_ratio = ssz_bytes as f64 / brotli_ssz_bytes as f64;
 
     println!("JSON -> GZIP JSON: {:.3}x improvement", json_to_gzip_ratio);
+    println!(
+        "JSON -> Brotli JSON: {:.3}x improvement",
+        json_to_brotli_ratio
+    );
     println!("JSON -> SSZ: {:.3}x improvement", json_to_ssz_ratio);
     println!(
         "JSON -> GZIP SSZ: {:.3}x improvement",
         json_to_gzip_ssz_ratio
     );
+    println!(
+        "JSON -> Brotli SSZ: {:.3}x improvement",
+        json_to_brotli_ssz_ratio
+    );
     println!("SSZ -> GZIP SSZ: {:.3}x improvement", ssz_to_gzip_ssz_ratio);
+    println!(
+        "SSZ -> Brotli SSZ: {:.3}x improvement",
+        ssz_to_brotli_ssz_ratio
+    );
 }
 
 fn encode_as_json(flashblocks: &Vec<FlashblocksPayloadV1>) -> usize {
@@ -104,6 +126,16 @@ fn encode_as_gzip_json(flashblocks: &Vec<FlashblocksPayloadV1>) -> usize {
     compressed.len()
 }
 
+fn encode_as_brotli_json(flashblocks: &Vec<FlashblocksPayloadV1>) -> usize {
+    let serialized = serde_json::to_vec(&flashblocks).unwrap();
+    let mut compressed = Vec::new();
+    {
+        let mut compressor = brotli::CompressorWriter::new(&mut compressed, 4096, 5, 22);
+        compressor.write_all(&serialized).unwrap();
+    }
+    compressed.len()
+}
+
 fn encode_as_ssz(flashblocks: &Vec<FlashblocksPayloadV1>) -> usize {
     flashblocks.as_ssz_bytes().len()
 }
@@ -114,5 +146,15 @@ fn encode_as_gzip_ssz(flashblocks: &Vec<FlashblocksPayloadV1>) -> usize {
     gz_encoder.write_all(&serialized).unwrap();
     let compressed = gz_encoder.finish().unwrap();
 
+    compressed.len()
+}
+
+fn encode_as_brotli_ssz(flashblocks: &Vec<FlashblocksPayloadV1>) -> usize {
+    let serialized = flashblocks.as_ssz_bytes();
+    let mut compressed = Vec::new();
+    {
+        let mut compressor = brotli::CompressorWriter::new(&mut compressed, 4096, 5, 22);
+        compressor.write_all(&serialized).unwrap();
+    }
     compressed.len()
 }
