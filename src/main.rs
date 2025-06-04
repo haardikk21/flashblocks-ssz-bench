@@ -31,7 +31,7 @@ struct Cli {
 
     /// Write gathered flashblocks to a local JSON file
     #[arg(short = 'w', long = "write")]
-    write: bool,
+    write: Option<PathBuf>,
 }
 
 #[tokio::main]
@@ -59,8 +59,8 @@ async fn main() {
 
     println!("Loaded {} flashblocks", flashblocks.len());
 
-    if cli.file.is_none() && cli.write {
-        let file_path = PathBuf::from("flashblocks.json");
+    if cli.file.is_none() && cli.write.is_some() {
+        let file_path = PathBuf::from(cli.write.unwrap());
         let file = File::create(&file_path).unwrap();
         serde_json::to_writer_pretty(file, &flashblocks).unwrap();
         println!("Wrote flashblocks to file: {}", &file_path.display());

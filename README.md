@@ -8,10 +8,10 @@ Compares bytes length of Flashblocks payloads as encoded with JSON, Gzipped JSON
 
 - `--duration` is specified in seconds
 
-- `--write` is optional, and will write the gathered flashblocks in a local `flashblocks.json` file
+- `--write` is optional, and will write the gathered flashblocks to the specified file
 
 ```bash
-cargo run -- --duration 60 --write
+cargo run -- --duration 60 --write flashblocks.json
 ```
 
 ### Reading from a file
