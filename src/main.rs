@@ -2,7 +2,7 @@ use std::{
     fs::{self, File},
     io::Write,
     path::PathBuf,
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use clap::Parser;
@@ -97,18 +97,18 @@ async fn main() {
 
     let mut json_bytes: usize = 0;
     let mut ssz_bytes: usize = 0;
-    for (label, bytes) in results.clone() {
+    for (label, (bytes, duration)) in results.clone() {
         if label == "JSON" {
             json_bytes = bytes;
         } else if label == "SSZ" {
             ssz_bytes = bytes;
         }
 
-        println!("{}: {:?} bytes", label, bytes);
+        println!("{}: {:?} bytes in {:?}", label, bytes, duration);
     }
 
     println!("");
-    for (label, bytes) in results.clone() {
+    for (label, (bytes, _)) in results.clone() {
         if label != "JSON" {
             let ratio = json_bytes as f64 / bytes as f64;
             println!("JSON -> {}: {:.3}x improvement", label, ratio);
@@ -121,49 +121,55 @@ async fn main() {
     }
 }
 
-async fn encode_as_json(flashblocks: Vec<FlashblocksPayloadV1>) -> usize {
+async fn encode_as_json(flashblocks: Vec<FlashblocksPayloadV1>) -> (usize, Duration) {
+    let start_time = Instant::now();
     let serialized = serde_json::to_vec(&flashblocks).unwrap();
-    serialized.len()
+    (serialized.len(), start_time.elapsed())
 }
 
-async fn encode_as_gzip_json(flashblocks: Vec<FlashblocksPayloadV1>) -> usize {
+async fn encode_as_gzip_json(flashblocks: Vec<FlashblocksPayloadV1>) -> (usize, Duration) {
+    let start_time = Instant::now();
     let serialized = serde_json::to_vec(&flashblocks).unwrap();
     let mut gz_encoder = GzEncoder::new(Vec::new(), Compression::default());
     gz_encoder.write_all(&serialized).unwrap();
     let compressed = gz_encoder.finish().unwrap();
 
-    compressed.len()
+    (compressed.len(), start_time.elapsed())
 }
 
-async fn encode_as_brotli_json(flashblocks: Vec<FlashblocksPayloadV1>) -> usize {
+async fn encode_as_brotli_json(flashblocks: Vec<FlashblocksPayloadV1>) -> (usize, Duration) {
+    let start_time = Instant::now();
     let serialized = serde_json::to_vec(&flashblocks).unwrap();
     let mut compressed = Vec::new();
     {
         let mut compressor = brotli::CompressorWriter::new(&mut compressed, 4096, 5, 22);
         compressor.write_all(&serialized).unwrap();
     }
-    compressed.len()
+    (compressed.len(), start_time.elapsed())
 }
 
-async fn encode_as_ssz(flashblocks: Vec<FlashblocksPayloadV1>) -> usize {
-    flashblocks.as_ssz_bytes().len()
+async fn encode_as_ssz(flashblocks: Vec<FlashblocksPayloadV1>) -> (usize, Duration) {
+    let start_time = Instant::now();
+    (flashblocks.as_ssz_bytes().len(), start_time.elapsed())
 }
 
-async fn encode_as_gzip_ssz(flashblocks: Vec<FlashblocksPayloadV1>) -> usize {
+async fn encode_as_gzip_ssz(flashblocks: Vec<FlashblocksPayloadV1>) -> (usize, Duration) {
+    let start_time = Instant::now();
     let serialized = flashblocks.as_ssz_bytes();
     let mut gz_encoder = GzEncoder::new(Vec::new(), Compression::default());
     gz_encoder.write_all(&serialized).unwrap();
     let compressed = gz_encoder.finish().unwrap();
 
-    compressed.len()
+    (compressed.len(), start_time.elapsed())
 }
 
-async fn encode_as_brotli_ssz(flashblocks: Vec<FlashblocksPayloadV1>) -> usize {
+async fn encode_as_brotli_ssz(flashblocks: Vec<FlashblocksPayloadV1>) -> (usize, Duration) {
+    let start_time = Instant::now();
     let serialized = flashblocks.as_ssz_bytes();
     let mut compressed = Vec::new();
     {
         let mut compressor = brotli::CompressorWriter::new(&mut compressed, 4096, 5, 22);
         compressor.write_all(&serialized).unwrap();
     }
-    compressed.len()
+    (compressed.len(), start_time.elapsed())
 }
