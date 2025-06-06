@@ -123,53 +123,76 @@ async fn main() {
 
 async fn encode_as_json(flashblocks: Vec<FlashblocksPayloadV1>) -> (usize, Duration) {
     let start_time = Instant::now();
-    let serialized = serde_json::to_vec(&flashblocks).unwrap();
-    (serialized.len(), start_time.elapsed())
+    let mut total_len = 0;
+    for flashblock in flashblocks {
+        let serialized = serde_json::to_vec(&flashblock).unwrap();
+        total_len += serialized.len();
+    }
+    (total_len, start_time.elapsed())
 }
 
 async fn encode_as_gzip_json(flashblocks: Vec<FlashblocksPayloadV1>) -> (usize, Duration) {
     let start_time = Instant::now();
-    let serialized = serde_json::to_vec(&flashblocks).unwrap();
-    let mut gz_encoder = GzEncoder::new(Vec::new(), Compression::default());
-    gz_encoder.write_all(&serialized).unwrap();
-    let compressed = gz_encoder.finish().unwrap();
-
-    (compressed.len(), start_time.elapsed())
+    let mut total_len = 0;
+    for flashblock in flashblocks {
+        let serialized = serde_json::to_vec(&flashblock).unwrap();
+        let mut gz_encoder = GzEncoder::new(Vec::new(), Compression::default());
+        gz_encoder.write_all(&serialized).unwrap();
+        let compressed = gz_encoder.finish().unwrap();
+        total_len += compressed.len();
+    }
+    (total_len, start_time.elapsed())
 }
 
 async fn encode_as_brotli_json(flashblocks: Vec<FlashblocksPayloadV1>) -> (usize, Duration) {
     let start_time = Instant::now();
-    let serialized = serde_json::to_vec(&flashblocks).unwrap();
-    let mut compressed = Vec::new();
-    {
-        let mut compressor = brotli::CompressorWriter::new(&mut compressed, 4096, 5, 22);
-        compressor.write_all(&serialized).unwrap();
+    let mut total_compressed_len = 0;
+    for flashblock in flashblocks {
+        let serialized = serde_json::to_vec(&flashblock).unwrap();
+        let mut compressed = Vec::new();
+        {
+            let mut compressor = brotli::CompressorWriter::new(&mut compressed, 4096, 5, 22);
+            compressor.write_all(&serialized).unwrap();
+        }
+        total_compressed_len += compressed.len();
     }
-    (compressed.len(), start_time.elapsed())
+
+    (total_compressed_len, start_time.elapsed())
 }
 
 async fn encode_as_ssz(flashblocks: Vec<FlashblocksPayloadV1>) -> (usize, Duration) {
     let start_time = Instant::now();
-    (flashblocks.as_ssz_bytes().len(), start_time.elapsed())
+    let mut total_len = 0;
+    for flashblock in flashblocks {
+        total_len += flashblock.as_ssz_bytes().len();
+    }
+    (total_len, start_time.elapsed())
 }
 
 async fn encode_as_gzip_ssz(flashblocks: Vec<FlashblocksPayloadV1>) -> (usize, Duration) {
     let start_time = Instant::now();
-    let serialized = flashblocks.as_ssz_bytes();
-    let mut gz_encoder = GzEncoder::new(Vec::new(), Compression::default());
-    gz_encoder.write_all(&serialized).unwrap();
-    let compressed = gz_encoder.finish().unwrap();
-
-    (compressed.len(), start_time.elapsed())
+    let mut total_len = 0;
+    for flashblock in flashblocks {
+        let serialized = flashblock.as_ssz_bytes();
+        let mut gz_encoder = GzEncoder::new(Vec::new(), Compression::default());
+        gz_encoder.write_all(&serialized).unwrap();
+        let compressed = gz_encoder.finish().unwrap();
+        total_len += compressed.len();
+    }
+    (total_len, start_time.elapsed())
 }
 
 async fn encode_as_brotli_ssz(flashblocks: Vec<FlashblocksPayloadV1>) -> (usize, Duration) {
     let start_time = Instant::now();
-    let serialized = flashblocks.as_ssz_bytes();
-    let mut compressed = Vec::new();
-    {
-        let mut compressor = brotli::CompressorWriter::new(&mut compressed, 4096, 5, 22);
-        compressor.write_all(&serialized).unwrap();
+    let mut total_compressed_len = 0;
+    for flashblock in flashblocks {
+        let serialized = flashblock.as_ssz_bytes();
+        let mut compressed = Vec::new();
+        {
+            let mut compressor = brotli::CompressorWriter::new(&mut compressed, 4096, 5, 22);
+            compressor.write_all(&serialized).unwrap();
+        }
+        total_compressed_len += compressed.len();
     }
-    (compressed.len(), start_time.elapsed())
+    (total_compressed_len, start_time.elapsed())
 }
